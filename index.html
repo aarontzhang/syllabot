@@ -792,17 +792,30 @@
             showStatus(`Adding ${selectedEvents.length} event(s) to your calendar...`, 'loading');
 
             try {
+                // Get refresh token from localStorage
+                const refreshToken = localStorage.getItem('google_refresh_token');
+
                 const response = await fetch('/create-events', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ events: selectedEvents })
+                    body: JSON.stringify({
+                        events: selectedEvents,
+                        refreshToken: refreshToken
+                    })
                 });
 
                 const data = await response.json();
 
-                if (response.ok) {
+                if (data.needsAuth) {
+                    // User needs to authenticate - redirect to Google OAuth
+                    showStatus('Redirecting to Google to authorize calendar access...', 'loading');
+                    window.location.href = data.authUrl;
+                    return;
+                }
+
+                if (response.ok && data.success) {
                     showStatus(`Success! Created ${data.eventsCreated} calendar event(s).`, 'success');
                     document.getElementById('eventsPreview').style.display = 'none';
                     // Reset form
@@ -810,7 +823,18 @@
                     fileNameDiv.style.display = 'none';
                     submitBtn.disabled = true;
                 } else {
-                    showStatus('Error: ' + data.error, 'error');
+                    // Check if auth expired
+                    if (response.status === 401 || data.needsAuth) {
+                        showStatus('Authorization expired. Please sign in again...', 'error');
+                        // Clear the old token
+                        localStorage.removeItem('google_refresh_token');
+                        // Retry the request, which will trigger auth flow
+                        setTimeout(() => {
+                            this.click();
+                        }, 1500);
+                    } else {
+                        showStatus('Error: ' + data.error, 'error');
+                    }
                 }
             } catch (error) {
                 showStatus('Error: ' + error.message, 'error');

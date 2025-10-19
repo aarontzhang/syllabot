@@ -18,6 +18,49 @@ if (!fs.existsSync('/tmp/uploads')) {
     fs.mkdirSync('/tmp/uploads', { recursive: true });
 }
 
+// Ensure auth state directory exists
+const authStateDir = '/tmp/auth-states';
+if (!fs.existsSync(authStateDir)) {
+    fs.mkdirSync(authStateDir, { recursive: true });
+}
+
+// Helper functions for auth state management
+function saveAuthState(stateCode, data) {
+    const filePath = path.join(authStateDir, `${stateCode}.json`);
+    fs.writeFileSync(filePath, JSON.stringify({
+        ...data,
+        timestamp: Date.now()
+    }));
+}
+
+function getAuthState(stateCode) {
+    const filePath = path.join(authStateDir, `${stateCode}.json`);
+    if (!fs.existsSync(filePath)) {
+        return null;
+    }
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+    // Check if expired (30 minutes)
+    if (Date.now() - data.timestamp > 30 * 60 * 1000) {
+        fs.unlinkSync(filePath);
+        return null;
+    }
+
+    return data;
+}
+
+function deleteAuthState(stateCode) {
+    const filePath = path.join(authStateDir, `${stateCode}.json`);
+    if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+    }
+}
+
+// Generate random state code
+function generateStateCode() {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
 // Serve static files
 app.use(express.static('.'));
 
@@ -119,8 +162,21 @@ async function extractDatesFromPDF(pdfText) {
     return JSON.parse(jsonText);
 }
 
-// Create Google Calendar events
-async function createCalendarEvents(events) {
+// Create Google Calendar events with user-specific auth
+async function createCalendarEvents(events, userRefreshToken) {
+    // Create a new OAuth client for this user
+    const userOAuth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/oauth2callback'
+    );
+
+    // Set the user's refresh token
+    userOAuth2Client.setCredentials({
+        refresh_token: userRefreshToken
+    });
+
+    const userCalendar = google.calendar({ version: 'v3', auth: userOAuth2Client });
     const createdEvents = [];
 
     for (const event of events) {
@@ -164,7 +220,7 @@ async function createCalendarEvents(events) {
         };
 
         try {
-            const response = await calendar.events.insert({
+            const response = await userCalendar.events.insert({
                 calendarId: 'primary',
                 resource: calendarEvent
             });
@@ -227,16 +283,29 @@ app.post('/upload', upload.single('syllabus'), async (req, res) => {
 // New endpoint to create selected events
 app.post('/create-events', express.json(), async (req, res) => {
     try {
-        const { events } = req.body;
+        const { events, refreshToken } = req.body;
 
         if (!events || !Array.isArray(events) || events.length === 0) {
             return res.status(400).json({ error: 'No events provided' });
         }
 
+        // If no refresh token, initiate OAuth flow
+        if (!refreshToken) {
+            // Generate state code and save events temporarily
+            const stateCode = generateStateCode();
+            saveAuthState(stateCode, { events });
+
+            return res.json({
+                success: false,
+                needsAuth: true,
+                authUrl: `/auth?state=${stateCode}`
+            });
+        }
+
         console.log('Creating selected events:', events.length);
 
-        // Create calendar events
-        const createdEvents = await createCalendarEvents(events);
+        // Create calendar events with user's token
+        const createdEvents = await createCalendarEvents(events, refreshToken);
 
         res.json({
             success: true,
@@ -246,40 +315,199 @@ app.post('/create-events', express.json(), async (req, res) => {
     } catch (error) {
         console.error('Error creating events:', error);
 
+        // Check if it's an auth error
+        if (error.message && (error.message.includes('invalid_grant') || error.message.includes('Token has been expired'))) {
+            return res.status(401).json({
+                error: 'Your authorization has expired. Please sign in again.',
+                needsAuth: true
+            });
+        }
+
         res.status(500).json({
             error: error.message || 'Failed to create calendar events'
         });
     }
 });
 
-// OAuth callback endpoint (for initial setup)
+// OAuth callback endpoint
 app.get('/oauth2callback', async (req, res) => {
     const code = req.query.code;
+    const state = req.query.state;
 
     if (!code) {
         return res.status(400).send('No authorization code provided');
     }
 
     try {
+        // Get tokens from Google
         const { tokens } = await oauth2Client.getToken(code);
-        console.log('Refresh Token:', tokens.refresh_token);
-        console.log('\nAdd this to your .env file:');
-        console.log(`GOOGLE_REFRESH_TOKEN=${tokens.refresh_token}`);
+        const refreshToken = tokens.refresh_token;
 
-        res.send('Authorization successful! Check your console for the refresh token and add it to your .env file.');
+        if (!refreshToken) {
+            return res.status(500).send('No refresh token received. Please try again.');
+        }
+
+        // If we have a state code, retrieve the pending events and create them
+        if (state) {
+            const authState = getAuthState(state);
+
+            if (authState && authState.events) {
+                // Create the events immediately
+                try {
+                    const createdEvents = await createCalendarEvents(authState.events, refreshToken);
+
+                    // Clean up the auth state
+                    deleteAuthState(state);
+
+                    // Return a success page with the refresh token embedded
+                    res.send(`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <title>Authorization Successful</title>
+                            <style>
+                                body {
+                                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                                    max-width: 600px;
+                                    margin: 50px auto;
+                                    padding: 20px;
+                                    text-align: center;
+                                }
+                                .success { color: #28a745; font-size: 48px; margin-bottom: 20px; }
+                                h1 { color: #333; }
+                                p { color: #666; line-height: 1.6; }
+                                .button {
+                                    background: #007bff;
+                                    color: white;
+                                    padding: 12px 24px;
+                                    border-radius: 6px;
+                                    text-decoration: none;
+                                    display: inline-block;
+                                    margin-top: 20px;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="success">✓</div>
+                            <h1>Success!</h1>
+                            <p>Created ${createdEvents.length} calendar event(s).</p>
+                            <p>Your authorization has been saved in your browser for future use.</p>
+                            <a href="/" class="button">Add More Events</a>
+                            <script>
+                                // Save refresh token to localStorage
+                                localStorage.setItem('google_refresh_token', '${refreshToken}');
+                            </script>
+                        </body>
+                        </html>
+                    `);
+                } catch (error) {
+                    console.error('Error creating events:', error);
+                    deleteAuthState(state);
+                    res.status(500).send('Authorization successful, but failed to create events: ' + error.message);
+                }
+            } else {
+                // State expired or invalid
+                res.send(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Session Expired</title>
+                        <style>
+                            body {
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                                max-width: 600px;
+                                margin: 50px auto;
+                                padding: 20px;
+                                text-align: center;
+                            }
+                            h1 { color: #dc3545; }
+                            p { color: #666; line-height: 1.6; }
+                            .button {
+                                background: #007bff;
+                                color: white;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                text-decoration: none;
+                                display: inline-block;
+                                margin-top: 20px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Session Expired</h1>
+                        <p>Your authorization session has expired. Please try again.</p>
+                        <a href="/" class="button">Go Back</a>
+                        <script>
+                            // Save refresh token anyway for future use
+                            localStorage.setItem('google_refresh_token', '${refreshToken}');
+                        </script>
+                    </body>
+                    </html>
+                `);
+            }
+        } else {
+            // No state - just return success (used for manual setup)
+            console.log('Refresh Token:', refreshToken);
+            console.log('\nAdd this to your .env file:');
+            console.log(`GOOGLE_REFRESH_TOKEN=${refreshToken}`);
+
+            res.send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Authorization Successful</title>
+                    <style>
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                            max-width: 600px;
+                            margin: 50px auto;
+                            padding: 20px;
+                            text-align: center;
+                        }
+                        .success { color: #28a745; font-size: 48px; margin-bottom: 20px; }
+                        h1 { color: #333; }
+                        p { color: #666; line-height: 1.6; }
+                        .button {
+                            background: #007bff;
+                            color: white;
+                            padding: 12px 24px;
+                            border-radius: 6px;
+                            text-decoration: none;
+                            display: inline-block;
+                            margin-top: 20px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="success">✓</div>
+                    <h1>Authorization Successful!</h1>
+                    <p>Your Google Calendar has been connected.</p>
+                    <a href="/" class="button">Start Adding Events</a>
+                    <script>
+                        // Save refresh token to localStorage
+                        localStorage.setItem('google_refresh_token', '${refreshToken}');
+                    </script>
+                </body>
+                </html>
+            `);
+        }
     } catch (error) {
         console.error('Error getting tokens:', error);
-        res.status(500).send('Error during authorization');
+        res.status(500).send('Error during authorization: ' + error.message);
     }
 });
 
 // Start authorization flow
 app.get('/auth', (req, res) => {
+    const state = req.query.state;
+
     const authUrl = oauth2Client.generateAuthUrl({
         access_type: 'offline',
         prompt: 'consent',
-        scope: ['https://www.googleapis.com/auth/calendar.events']
+        scope: ['https://www.googleapis.com/auth/calendar.events'],
+        ...(state && { state })
     });
+
     res.redirect(authUrl);
 });
 

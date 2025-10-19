@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syllabot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0f;
+            color: #e4e4e7;
+            min-height: 100vh;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* Animated gradient background - Cursor-inspired */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 70%, rgba(168, 85, 247, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 60px 40px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header Section */
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            color: #ffffff;
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #ffffff 0%, #a8a8b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #a1a1aa;
+            font-size: 18px;
+            font-weight: 400;
+            line-height: 1.6;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Main Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Card styling */
+        .card {
+            background: rgba(24, 24, 27, 0.6);
+            border: 1px solid rgba(63, 63, 70, 0.4);
+            border-radius: 16px;
+            padding: 32px;
+            backdrop-filter: blur(20px);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.1);
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 48px 32px;
+            text-align: center;
+            background: rgba(39, 39, 42, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .upload-area:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(39, 39, 42, 0.4);
+        }
+
+        .upload-area.has-file {
+            border-color: rgba(34, 197, 94, 0.4);
+            background: rgba(39, 39, 42, 0.3);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: #71717a;
+            position: relative;
+            z-index: 1;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .upload-icon svg {
+            display: block;
+        }
+
+        .upload-area.has-file .upload-icon {
+            color: #22c55e;
+        }
+
+        .upload-text {
+            color: #e4e4e7;
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area.has-file .upload-text {
+            color: #22c55e;
+        }
+
+        .upload-subtext {
+            color: #71717a;
+            font-size: 13px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .upload-content {
+            transition: opacity 0.3s ease;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-name {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 8px;
+            color: #86efac;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        /* Event Type Filters */
+        .event-type-filters {
+            margin-top: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .event-type-filters h3 {
+            color: #a1a1aa;
+            font-size: 14px;
+            margin: 0;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .filter-bubbles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .filter-bubble {
+            position: relative;
+            display: inline-block;
+        }
+
+        .filter-bubble input[type="checkbox"] {
+            display: none;
+        }
+
+        .filter-bubble label {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: rgba(39, 39, 42, 0.6);
+            border: 1px solid rgba(63, 63, 70, 0.4);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            font-weight: 500;
+            color: #71717a;
+            user-select: none;
+        }
+
+        .filter-bubble label:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(63, 63, 70, 0.6);
+            color: #a1a1aa;
+        }
+
+        .filter-bubble input[type="checkbox"]:checked + label {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Buttons */
+        button {
+            background: #ffffff;
+            color: #0a0a0f;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 24px;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background: #f4f4f5;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        button:disabled:hover {
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #a1a1aa;
+            border: 1px solid rgba(63, 63, 70, 0.5);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(63, 63, 70, 0.5);
+            color: #e4e4e7;
+        }
+
+        /* Status Messages */
+        .status {
+            margin-top: 20px;
+            padding: 16px 20px;
+            border-radius: 10px;
+            display: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: rgba(34, 197, 94, 0.1);
+            color: #86efac;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status.loading {
+            background: rgba(59, 130, 246, 0.1);
+            color: #93c5fd;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        /* Events Preview */
+        .events-preview {
+            margin-top: 32px;
+            display: none;
+        }
+
+        .events-preview h2 {
+            color: #ffffff;
+            font-size: 24px;
+            margin-bottom: 24px;
+            font-weight: 600;
+        }
+
+        .select-all-container {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: rgba(39, 39, 42, 0.5);
+            border-radius: 10px;
+            border: 1px solid rgba(63, 63, 70, 0.4);
+        }
+
+        .select-all-container label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 500;
+            color: #e4e4e7;
+        }
+
+        .select-all-container input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            cursor: pointer;
+            accent-color: #6366f1;
+        }
+
+        .events-list {
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        /* Custom scrollbar */
+        .events-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .events-list::-webkit-scrollbar-track {
+            background: rgba(39, 39, 42, 0.3);
+            border-radius: 4px;
+        }
+
+        .events-list::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.4);
+            border-radius: 4px;
+        }
+
+        .events-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.6);
+        }
+
+        .event-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 20px;
+            margin-bottom: 12px;
+            background: rgba(39, 39, 42, 0.5);
+            border-radius: 12px;
+            border: 1px solid rgba(63, 63, 70, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .event-item:hover {
+            border-color: rgba(99, 102, 241, 0.5);
+            background: rgba(39, 39, 42, 0.7);
+            transform: translateX(4px);
+        }
+
+        .event-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 16px;
+            margin-top: 2px;
+            cursor: pointer;
+            flex-shrink: 0;
+            accent-color: #6366f1;
+        }
+
+        .event-details {
+            flex: 1;
+        }
+
+        .event-title {
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .event-meta {
+            font-size: 13px;
+            color: #a1a1aa;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .event-meta span {
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .event-date {
+            color: #a5b4fc;
+            font-weight: 500;
+        }
+
+        .selection-actions {
+            display: flex;
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .selection-actions button {
+            flex: 1;
+            padding: 14px;
+            font-size: 15px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 40px 20px;
+            }
+
+            h1 {
+                font-size: 36px;
+            }
+
+            .subtitle {
+                font-size: 16px;
+            }
+
+            .card {
+                padding: 24px;
+            }
+
+            .event-type-filters {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .filter-bubbles {
+                gap: 8px;
+            }
+
+            .filter-bubble label {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Syllabot</h1>
+            <p class="subtitle">Transform your syllabus into organized calendar events</p>
+        </div>
+
+        <div class="content-grid">
+            <div class="card">
+                <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-content">
+                        <div class="upload-icon" id="uploadIcon">
+                            <svg id="uploadSvg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <svg id="checkSvg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="9 12 11 14 15 10"></polyline>
+                            </svg>
+                        </div>
+                        <div class="upload-text" id="uploadText">Click to upload or drag and drop</div>
+                        <div class="upload-subtext">PDF files only</div>
+                    </div>
+                </div>
+
+                <input type="file" id="fileInput" accept=".pdf" />
+
+                <div class="file-name" id="fileName" style="display: none;"></div>
+
+                <div class="event-type-filters">
+                    <h3>Track:</h3>
+                    <div class="filter-bubbles">
+                        <div class="filter-bubble">
+                            <input type="checkbox" id="filter-exam" value="Exam" checked>
+                            <label for="filter-exam">Exams</label>
+                        </div>
+                        <div class="filter-bubble">
+                            <input type="checkbox" id="filter-project" value="Project" checked>
+                            <label for="filter-project">Projects</label>
+                        </div>
+                        <div class="filter-bubble">
+                            <input type="checkbox" id="filter-paper" value="Paper" checked>
+                            <label for="filter-paper">Papers</label>
+                        </div>
+                        <div class="filter-bubble">
+                            <input type="checkbox" id="filter-assignment" value="Assignment">
+                            <label for="filter-assignment">Assignments</label>
+                        </div>
+                        <div class="filter-bubble">
+                            <input type="checkbox" id="filter-presentation" value="Presentation">
+                            <label for="filter-presentation">Presentations</label>
+                        </div>
+                        <div class="filter-bubble">
+                            <input type="checkbox" id="filter-deadline" value="Deadline">
+                            <label for="filter-deadline">Deadlines</label>
+                        </div>
+                        <div class="filter-bubble">
+                            <input type="checkbox" id="filter-break" value="Break">
+                            <label for="filter-break">Breaks</label>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="submitBtn" disabled>Analyze Syllabus</button>
+
+                <div class="status" id="status"></div>
+            </div>
+
+            <div class="events-preview" id="eventsPreview">
+                <h2>Select Events to Add</h2>
+
+                <div class="select-all-container">
+                    <label>
+                        <input type="checkbox" id="selectAll" checked>
+                        Select All / Deselect All
+                    </label>
+                </div>
+
+                <div class="events-list" id="eventsList"></div>
+
+                <div class="selection-actions">
+                    <button class="btn-secondary" onclick="cancelEvents()">Cancel</button>
+                    <button id="createEventsBtn">Add Selected to Calendar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const fileNameDiv = document.getElementById('fileName');
+        const statusDiv = document.getElementById('status');
+        const uploadArea = document.querySelector('.upload-area');
+
+        // Handle file selection via input
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                const file = this.files[0];
+                fileNameDiv.textContent = 'Selected: ' + file.name;
+                fileNameDiv.style.display = 'block';
+                submitBtn.disabled = false;
+
+                // Show success state
+                const uploadArea = document.getElementById('uploadArea');
+                const uploadSvg = document.getElementById('uploadSvg');
+                const checkSvg = document.getElementById('checkSvg');
+                const uploadText = document.getElementById('uploadText');
+
+                uploadArea.classList.add('has-file');
+                uploadSvg.style.display = 'none';
+                checkSvg.style.display = 'block';
+                uploadText.textContent = 'PDF uploaded successfully';
+            }
+        });
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop area when dragging over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            uploadArea.style.borderColor = 'rgba(99, 102, 241, 0.6)';
+            uploadArea.style.background = 'rgba(39, 39, 42, 0.5)';
+        }
+
+        function unhighlight(e) {
+            uploadArea.style.borderColor = '';
+            uploadArea.style.background = '';
+        }
+
+        // Handle dropped files
+        uploadArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            if (files.length > 0) {
+                const file = files[0];
+                // Check if it's a PDF
+                if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    fileInput.files = files;
+                    fileNameDiv.textContent = 'Selected: ' + file.name;
+                    fileNameDiv.style.display = 'block';
+                    submitBtn.disabled = false;
+
+                    // Show success state
+                    const uploadArea = document.getElementById('uploadArea');
+                    const uploadSvg = document.getElementById('uploadSvg');
+                    const checkSvg = document.getElementById('checkSvg');
+                    const uploadText = document.getElementById('uploadText');
+
+                    uploadArea.classList.add('has-file');
+                    uploadSvg.style.display = 'none';
+                    checkSvg.style.display = 'block';
+                    uploadText.textContent = 'PDF uploaded successfully';
+                } else {
+                    showStatus('Please upload a PDF file only', 'error');
+                }
+            }
+        }
+
+        let extractedEvents = [];
+
+        // Get selected event types from filters
+        function getSelectedEventTypes() {
+            const filterCheckboxes = document.querySelectorAll('.filter-bubble input[type="checkbox"]:checked');
+            return Array.from(filterCheckboxes).map(cb => cb.value);
+        }
+
+        submitBtn.addEventListener('click', async function() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const selectedTypes = getSelectedEventTypes();
+
+            if (selectedTypes.length === 0) {
+                showStatus('Please select at least one event type to track.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('syllabus', file);
+
+            submitBtn.disabled = true;
+            showStatus('Analyzing syllabus...', 'loading');
+            document.getElementById('eventsPreview').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Filter events based on selected types
+                    extractedEvents = data.events.filter(event => selectedTypes.includes(event.type));
+
+                    if (extractedEvents.length === 0) {
+                        showStatus('No events found matching your selected types. Try selecting more event types.', 'error');
+                    } else {
+                        showStatus(`Analysis complete! Found ${extractedEvents.length} event(s) matching your criteria.`, 'success');
+                        displayEvents(extractedEvents);
+                    }
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        function displayEvents(events) {
+            const eventsList = document.getElementById('eventsList');
+            const eventsPreview = document.getElementById('eventsPreview');
+
+            eventsList.innerHTML = '';
+
+            events.forEach((event, index) => {
+                const eventItem = document.createElement('div');
+                eventItem.className = 'event-item';
+
+                // Since user already pre-filtered by type, check all events by default
+                eventItem.innerHTML = `
+                    <input type="checkbox" id="event-${index}" checked data-index="${index}">
+                    <div class="event-details">
+                        <div class="event-title">
+                            ${event.emoji} ${event.className} - ${event.type}: ${event.title}
+                        </div>
+                        <div class="event-meta">
+                            <span class="event-date">${formatDate(event.date)}</span>
+                            ${event.location ? `<span>${event.location}</span>` : ''}
+                            ${event.additionalDetails ? `<span>${event.additionalDetails}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                eventsList.appendChild(eventItem);
+            });
+
+            eventsPreview.style.display = 'block';
+            updateSelectAllCheckbox();
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            return date.toLocaleDateString('en-US', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        // Select all functionality
+        const selectAllCheckbox = document.getElementById('selectAll');
+        selectAllCheckbox.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.event-item input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = this.checked);
+        });
+
+        // Update select all checkbox when individual checkboxes change
+        document.getElementById('eventsList').addEventListener('change', function(e) {
+            if (e.target.type === 'checkbox') {
+                updateSelectAllCheckbox();
+            }
+        });
+
+        function updateSelectAllCheckbox() {
+            const checkboxes = document.querySelectorAll('.event-item input[type="checkbox"]');
+            const checkedCount = document.querySelectorAll('.event-item input[type="checkbox"]:checked').length;
+            selectAllCheckbox.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+        }
+
+        // Create selected events
+        document.getElementById('createEventsBtn').addEventListener('click', async function() {
+            const selectedCheckboxes = document.querySelectorAll('.event-item input[type="checkbox"]:checked');
+
+            if (selectedCheckboxes.length === 0) {
+                showStatus('Please select at least one event to add to your calendar.', 'error');
+                return;
+            }
+
+            const selectedEvents = Array.from(selectedCheckboxes).map(cb => {
+                const index = parseInt(cb.dataset.index);
+                return extractedEvents[index];
+            });
+
+            this.disabled = true;
+            showStatus(`Adding ${selectedEvents.length} event(s) to your calendar...`, 'loading');
+
+            try {
+                const response = await fetch('/api/create-events', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ events: selectedEvents })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showStatus(`Success! Created ${data.eventsCreated} calendar event(s).`, 'success');
+                    document.getElementById('eventsPreview').style.display = 'none';
+                    // Reset form
+                    fileInput.value = '';
+                    fileNameDiv.style.display = 'none';
+                    submitBtn.disabled = true;
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            } finally {
+                this.disabled = false;
+            }
+        });
+
+        function cancelEvents() {
+            document.getElementById('eventsPreview').style.display = 'none';
+            showStatus('', '');
+            statusDiv.style.display = 'none';
+        }
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+            statusDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

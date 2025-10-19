@@ -685,7 +685,7 @@
             document.getElementById('eventsPreview').style.display = 'none';
 
             try {
-                const response = await fetch('/api/upload', {
+                const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
                 });
@@ -792,7 +792,7 @@
             showStatus(`Adding ${selectedEvents.length} event(s) to your calendar...`, 'loading');
 
             try {
-                const response = await fetch('/api/create-events', {
+                const response = await fetch('/create-events', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

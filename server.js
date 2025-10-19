@@ -10,12 +10,12 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configure multer for file uploads
-const upload = multer({ dest: 'uploads/' });
+// Configure multer for file uploads (use /tmp for serverless)
+const upload = multer({ dest: '/tmp/uploads/' });
 
 // Ensure uploads directory exists
-if (!fs.existsSync('uploads')) {
-    fs.mkdirSync('uploads');
+if (!fs.existsSync('/tmp/uploads')) {
+    fs.mkdirSync('/tmp/uploads', { recursive: true });
 }
 
 // Serve static files
@@ -282,11 +282,17 @@ app.get('/auth', (req, res) => {
     res.redirect(authUrl);
 });
 
-app.listen(port, () => {
-    console.log(`\nSyllabus Calendar Creator running at http://localhost:${port}`);
-    console.log('\nMake sure you have set up your .env file with the required API keys!');
+// Only start server if not in serverless environment
+if (process.env.VERCEL !== '1') {
+    app.listen(port, () => {
+        console.log(`\nSyllabus Calendar Creator running at http://localhost:${port}`);
+        console.log('\nMake sure you have set up your .env file with the required API keys!');
 
-    if (!process.env.GOOGLE_REFRESH_TOKEN) {
-        console.log('\nTo authorize Google Calendar, visit: http://localhost:3000/auth');
-    }
-});
+        if (!process.env.GOOGLE_REFRESH_TOKEN) {
+            console.log('\nTo authorize Google Calendar, visit: http://localhost:3000/auth');
+        }
+    });
+}
+
+// Export for Vercel serverless
+module.exports = app;
